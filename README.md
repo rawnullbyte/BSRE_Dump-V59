@@ -977,7 +977,7 @@ console.log("Cheat menu created with " + cheatOptions.length + " options");
 // Example output: "Cheat menu created with 5 options"
 ```
 
-Example original code:
+# Example original code:
 ```js
 // =============================================
 // BRAWL STARS CHEAT - COMPLETE DEOBFUSCATED FRIDA CODE
