@@ -979,10 +979,6 @@ console.log("Cheat menu created with " + cheatOptions.length + " options");
 
 # Example original code:
 ```js
-// =============================================
-// BRAWL STARS CHEAT - COMPLETE DEOBFUSCATED FRIDA CODE
-// =============================================
-
 Java.perform(function() {
     console.log("[+] Brawl Stars Cheat Initializing...");
     
