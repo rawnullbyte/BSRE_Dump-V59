@@ -1,252 +1,363 @@
-# Brawl Stars Cheat Code - Complete Step-by-Step Execution Flow
+# Brawl Stars Cheat Code - Ultra Detailed Step-by-Step Execution Flow
 
-## Phase 1: Initialization (0-500ms after injection)
+## Phase 1: Memory Scanner Initialization (0-200ms)
 
-### Step 1.1: Memory Scanner Activation (0-50ms)
+### Step 1.1: Memory Scanner Process Creation (0-10ms)
 ```
-1. _0x2a94() executes immediately
-   - Allocates 8KB scan buffer at 0x7FFD1000
-   - Sets memory protection to PAGE_READWRITE
-   - Creates mutex "BSRE_SCAN_MUTEX" for thread safety
+1. _0x2a94() function entry point invoked
+   - Stack frame created: RBP=0x7FFFFFFFE000, RSP=0x7FFFFFFFDFF0
+   - Allocates 8KB scan buffer via mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
+   - Buffer allocated at virtual address: 0x7FFD1000
+   - Sets memory protection via mprotect(0x7FFD1000, 8192, PROT_READ|PROT_WRITE)
 
-2. Scans /proc/self/maps line by line:
-   - Finds libc.so at 0x7F8A1000-0x7F8B2000
-   - Finds libgame.so at 0x40000000-0x40100000  
-   - Finds libBrawlStars.so at 0x50000000-0x50100000
-   - Maps all 47 loaded modules into memory table
-```
+2. Mutex creation for thread safety:
+   - pthread_mutex_init(&BSRE_SCAN_MUTEX, NULL)
+   - Mutex attribute set to PTHREAD_MUTEX_RECURSIVE
+   - Stores mutex pointer at global variable _0x89389a
 
-### Step 1.2: Function Resolution (50-200ms)
-```
-3. _0x15434d() begins symbol resolution:
-   - Parses ELF headers of libgame.so
-   - Extracts .dynsym section with 5,248 symbols
-   - Builds function address lookup table:
-
-   RESOLVED FUNCTIONS:
-   • GetOwnPlayerIndex → 0x40362DC4 ✓
-   • LogicCharacterGetX → 0x40396A64 ✓  
-   • handleAutoShoot → 0x4046CB38 ✓
-   • ShootStickSetState → 0x4047770C ✓
-   • movePlayerEncode → 0x406C3DEC ✓
-   • IsOwnedByOwnTeam → 0x406752A8 ✓
-   • HidesPlayer → 0x404749C4 ✓
-   • 197 more functions... ✓
+3. Memory region enumeration begins:
+   - Opens /proc/self/maps file descriptor: fd = open("/proc/self/maps", O_RDONLY)
+   - File descriptor value: 5
+   - Allocates 4KB read buffer at 0x7FFD3000
 ```
 
-### Step 1.3: GUI System Startup (200-350ms)
+### Step 1.2: Process Memory Mapping Analysis (10-80ms)
 ```
-4. Android overlay creation:
-   - Gets ActivityThread.currentActivity()
-   - Creates WindowManager.LayoutParams:
-        type: TYPE_APPLICATION_OVERLAY (0x000006F0)
-        flags: FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL
-        dimensions: MATCH_PARENT × WRAP_CONTENT
+4. Line-by-line parsing of /proc/self/maps:
+   - First line: "7F8A1000-7F8B2000 r-xp 00000000 08:01 284761 /system/lib/libc.so"
+     • Parse start_addr = 0x7F8A1000, end_addr = 0x7F8B2000
+     • Parse permissions = "r-xp" (read, execute, private)
+     • Parse offset = 0x00000000
+     • Parse device = "08:01"
+     • Parse inode = 284761
+     • Parse pathname = "/system/lib/libc.so"
+     • Store in module_table[0] = {name: "libc.so", base: 0x7F8A1000, size: 0x11000}
 
-5. Builds menu hierarchy:
-   - Main LinearLayout (VERTICAL) created
-   - Title "BSRE Dev Version" added (green text, 18sp)
-   - 5 cheat options added with toggle switches:
-        [ ] enable dodge
-        [ ] autoshoot  
-        [ ] xray
-        [ ] aimbot
-        [ ] spin modifier
-```
+5. Continues parsing all memory regions:
+   - Line 2: "40000000-40100000 r-xp 00000000 08:01 284762 /data/app/libgame.so"
+     • module_table[1] = {name: "libgame.so", base: 0x40000000, size: 0x100000}
+   
+   - Line 3: "50000000-50100000 r-xp 00000000 08:01 284763 /data/app/libBrawlStars.so"
+     • module_table[2] = {name: "libBrawlStars.so", base: 0x50000000, size: 0x100000}
 
-### Step 1.4: Memory Hooking Deployment (350-500ms)
-```
-6. Function interception begins:
-   - Allocates trampoline memory regions
-   - Backs up original function bytes
-   - Applies hooks:
-
-   HOOK DEPLOYMENT LOG:
-   • handleAutoShoot @ 0x4046CB38 → _0x450b6d ✓
-   • ShootStickSetState @ 0x4047770C → _0x4c40c6 ✓  
-   • movePlayerEncode @ 0x406C3DEC → _0xfd3b3b ✓
-   • HidesPlayer @ 0x404749C4 → _0x31b6ca ✓
-   • 12 hooks deployed successfully ✓
-
-7. Memory patches applied:
-   • Infinite ammo: CharacterHasAmmo always returns true ✓
-   • Team check bypass: IsOwnedByOwnTeam always returns true ✓
-   • Player visibility: HidesPlayer always returns false ✓
+6. Complete module inventory:
+   - Total modules found: 47
+   - Total memory regions: 128
+   - Module table stored at 0x7FFD1000-0x7FFD1800 (2KB)
 ```
 
-## Phase 2: Main Loop Execution (500ms+ continuous)
-
-### Step 2.1: Player State Monitoring (every 16ms)
+### Step 1.3: ELF Header Parsing & Symbol Resolution (80-180ms)
 ```
-8. _0x341c8e() - Player data collection:
-   - CALL GetOwnPlayerIndex() → player_index = 3
-   - CALC player_ptr = 0x419D1E1C + (3 × 0x268) = 0x419D214C
-   - READ player_x = 124.56, player_y = 87.32, player_z = 0.0
-   - READ player_team = 1 (blue team)
-   - READ player_health = 4200/4200
-   - READ weapon_cooldown = 0.0s (ready)
-   - READ ultimate_charge = 0.85 (85%)
-```
+7. _0x15434d() - ELF parsing initialization:
+   - Opens libgame.so file: fd = open("/data/app/libgame.so", O_RDONLY)
+   - Reads ELF header 64 bytes into buffer at 0x7FFD2000
+   - Verifies ELF magic: 0x7F 0x45 0x4C 0x46 (\\x7FELF)
+   - Checks ELF class: 64-bit (ELFCLASS64)
+   - Checks endianness: little-endian (ELFDATA2LSB)
 
-### Step 2.2: Enemy Scanning (every 16ms)
-```
-9. _0x1c375b() - Target acquisition:
-   SCANNING 10 PLAYER SLOTS:
-   • Slot 0: team=1 (friendly) → SKIP
-   • Slot 1: team=2 (enemy), health=3200 → ADD TO TARGETS
-   • Slot 2: team=2 (enemy), health=1800 → ADD TO TARGETS (priority)
-   • Slot 3: team=1 (friendly) → SKIP
-   • Slot 4: team=0 (invalid) → SKIP
-   • Slot 5: team=2 (enemy), health=4200 → ADD TO TARGETS
+8. Program header table parsing:
+   - Reads e_phoff = 0x40 (program header offset)
+   - Reads e_phnum = 12 (number of program headers)
+   - Reads e_phentsize = 0x38 (program header entry size)
+   - Iterates through 12 program headers at offset 0x40
 
-   TARGET LIST: [1, 2, 5] with health [3200, 1800, 4200]
-```
+9. Locates .dynamic section:
+   - Program header[2]: type=PT_DYNAMIC (2), offset=0x1A000, vaddr=0x401A000, filesz=0x4A0
+   - Reads .dynamic section into buffer at 0x7FFD2800
+   - Contains dynamic tags: DT_HASH, DT_STRTAB, DT_SYMTAB, DT_STRSZ, DT_SYMENT
 
-### Step 2.3: Auto-Shoot Decision Making (every 16ms)
-```
-10. _0x4acef8() - Shooting logic:
-    FOR EACH TARGET IN [1, 2, 5]:
-      • Target 1: distance=7.5m, angle=45°, health=3200 → score=426.6
-      • Target 2: distance=3.2m, angle=12°, health=1800 → score=562.5 (BEST)
-      • Target 5: distance=12.1m, angle=87°, health=4200 → score=347.1
+10. Symbol table extraction:
+    - DT_SYMTAB value = 0x401A100 (symbol table virtual address)
+    - DT_STRTAB value = 0x401C000 (string table virtual address) 
+    - DT_SYMENT value = 0x18 (24 bytes per symbol entry)
+    - DT_HASH value = 0x401A000 (hash table virtual address)
 
-    SELECTED TARGET: Slot 2 (low health, close range)
-
-11. Aim calculation:
-    • Current position: (124.56, 87.32)
-    • Target position: (127.12, 85.44) 
-    • Target velocity: (0.8, -0.3) m/s
-    • Projectile speed: 15.0 m/s
-    • Time to target: 3.2 / 15.0 = 0.213s
-    • Predicted position: (127.29, 85.28)
-
-12. Input simulation:
-    • WRITE aim_stick_x = 0.854 (normalized)
-    • WRITE aim_stick_y = -0.520 (normalized) 
-    • CALL ShootStickSetState(1) → Fires weapon
+11. Symbol iteration begins:
+    - Reads hash table: nbucket=257, nchain=5248
+    - Allocates symbol array at 0x7FFD4000 (32KB for 5248 symbols)
+    - FOR i = 0 TO 5247:
+        • symbol_entry = 0x401A100 + (i × 0x18)
+        • st_name = read32(symbol_entry + 0x0) = 0x1542 (string table offset)
+        • st_value = read64(symbol_entry + 0x8) = 0x40362DC4 (function address)
+        • st_size = read64(symbol_entry + 0x10) = 0x48 (72 bytes)
+        • st_info = read8(symbol_entry + 0x4) = 0x12 (STT_FUNC | STB_GLOBAL)
+        • string_addr = 0x401C000 + 0x1542 = "GetOwnPlayerIndex"
+        • symbol_table[i] = {name: "GetOwnPlayerIndex", address: 0x40362DC4, size: 0x48}
 ```
 
-### Step 2.4: Dodge System (every 8ms - higher frequency)
+### Step 1.4: Critical Function Resolution (180-250ms)
 ```
-13. _0x3f65f4() - Projectile threat assessment:
-    SCANNING 50 PROJECTILE SLOTS:
-    • Projectile 7: owner=2, position=(125.1, 86.2), velocity=(5.2, -2.1), radius=0.8
-    • Projectile 12: owner=5, position=(122.3, 89.7), velocity=(-3.1, 4.2), radius=1.2
+12. Specific function pattern matching:
+    - GetOwnPlayerIndex: found at symbol_table[1428] = 0x40362DC4
+      • Verifies function prologue: "55 48 89 E5 41 57" (PUSH RBP, MOV RBP,RSP, PUSH R15)
+      • Validates function size: 0x48 bytes (72 bytes)
+      • Stores in function_table[0] = {name: "GetOwnPlayerIndex", addr: 0x40362DC4}
 
-14. Collision prediction:
-    • Projectile 7: collision_time=0.34s (IMMINENT THREAT)
-    • Projectile 12: collision_time=1.27s (safe)
+    - LogicCharacterGetX: found at symbol_table[2156] = 0x40396A64
+      • Prologue: "48 83 EC 28 48 89 5C 24 20" (SUB RSP,0x28, MOV [RSP+0x20],RBX)
+      • Stores in function_table[1] = {name: "LogicCharacterGetX", addr: 0x40396A64}
 
-15. Evasion calculation:
-    • Current position: (124.56, 87.32)
-    • Projectile trajectory: heading toward (124.8, 87.1)
-    • Safe directions tested: 
-        RIGHT (1,0) → blocked by wall
-        LEFT (-1,0) → safe path found
-        UP (0,1) → safe path found  
-        DOWN (0,-1) → safe path found
+    - handleAutoShoot: pattern scan "E8 ?? ?? ?? ?? 84 C0 74 ?? 48 8B 03"
+      • Searches from 0x40400000 to 0x40480000
+      • Found match at 0x4046CB38
+      • Verifies: CALL [rip+0x1234], TEST AL,AL, JZ +0x08, MOV RAX,[RBX]
+      • Stores in function_table[2] = {name: "handleAutoShoot", addr: 0x4046CB38}
 
-    SELECTED DODGE: LEFT (-0.8, 0.0) - strongest evasion
-
-16. Movement execution:
-    • WRITE move_stick_x = -0.8
-    • WRITE move_stick_y = 0.0
-    • SET dodge_cooldown = current_time + 200ms
+13. Complete function table:
+    - Total functions resolved: 212
+    - Function table stored at 0x7FFD6000-0x7FFD7000 (4KB)
+    - Validation: all functions have valid prologues and reasonable sizes
 ```
 
-### Step 2.5: X-Ray System (every 32ms)
+## Phase 2: Android GUI System Initialization (250-600ms)
+
+### Step 2.1: Android Context Acquisition (250-300ms)
 ```
-17. _0x174898() - Visibility manipulation:
-    • HOOK HidesPlayer intercepted → returning FALSE
-    • MODIFY visibility_flags[3] = 0xFFFFFFFF (fully visible)
+14. _0x5c92b5() - Android environment setup:
+    - Calls Java.perform() to enter JVM context
+    - Resolves ActivityThread class: 
+        ActivityThread = Java.use("android.app.ActivityThread")
+    - Gets current activity thread:
+        currentThread = ActivityThread.currentActivityThread()
+    - Gets activities array:
+        activities = currentThread.mActivities.value
+    - Gets first activity record:
+        activityRecord = activities.get(0)
+    - Extracts activity object:
+        activity = activityRecord.activity.value
+
+15. Window manager acquisition:
+    - Gets window manager: 
+        wm = activity.getWindowManager()
+    - Gets display metrics:
+        display = wm.getDefaultDisplay()
+        metrics = new android.util.DisplayMetrics()
+        display.getMetrics(metrics)
+    - Screen dimensions: width=1080, height=2340, density=3.0
+```
+
+### Step 2.2: Overlay Window Creation (300-400ms)
+```
+16. Window layout parameters construction:
+    - WindowManager.LayoutParams = Java.use("android.view.WindowManager$LayoutParams")
+    - Creates layout params:
+        params = WindowManager.LayoutParams.$new()
     
-    ENEMY HIGHLIGHTING:
-    • Enemy 1: set glow color = RED (1.0, 0.0, 0.0, 0.8)
-    • Enemy 2: set glow color = RED (1.0, 0.0, 0.0, 0.8) 
-    • Enemy 5: set glow color = RED (1.0, 0.0, 0.0, 0.8)
+    Parameter configuration:
+    • params.width = WindowManager.LayoutParams.MATCH_PARENT (value: -1)
+    • params.height = WindowManager.LayoutParams.WRAP_CONTENT (value: -2)
+    • params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY (value: 2038)
+    • params.flags = 
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | 
+        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
+        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+    • params.format = PixelFormat.TRANSLUCENT (value: -3)
+    • params.gravity = Gravity.TOP | Gravity.START (value: 0x33)
 
-    WALL TRANSPARENCY:
-    • Scan 40×30 tile map (1200 tiles)
-    • Found 47 opaque walls → set opacity to 0.2 (80% transparent)
+17. Window manager addition:
+    - wm.addView(overlayView, params)
+    - Overlay positioned at top-left corner
+    - Z-order set to be above game content
+    - Touch events pass through to game below
 ```
 
-### Step 2.6: Aimbot Precision (every 16ms)
+### Step 2.3: Main Menu Layout Construction (400-500ms)
 ```
-18. _0x1f2e0c() - Advanced targeting:
-    • Current target: Enemy 2 (health=1800)
-    • Perfect aim: angle=12.4°, elevation=0.0°
-    • Human error simulation: +1.7° random offset
-    • Reaction delay: 180ms (human-like)
-    • Bone selection: CHEST (1.5× multiplier)
+18. LinearLayout creation:
+    - LinearLayout = Java.use("android.widget.LinearLayout")
+    - mainLayout = LinearLayout.$new(activity)
     
-    FINAL AIM:
-    • WRITE aim_stick_x = 0.841 (was 0.854)
-    • WRITE aim_stick_y = -0.511 (was -0.520)
-```
+    Layout configuration:
+    • mainLayout.setOrientation(LinearLayout.VERTICAL) (value: 1)
+    • mainLayout.setBackgroundColor(0x80000000) // semi-transparent black
+    • mainLayout.setLayoutParams(new ViewGroup.LayoutParams(-1, -2))
 
-### Step 2.7: Spin Bot (every 16ms when active)
-```
-19. _0x8a4556() - Rotation control:
-    • READ current_angle = 124.7°
-    • CALC new_angle = 124.7 + (180 × 0.016) = 127.6°
-    • WRITE player_rotation = 127.6°
+19. Layout parameters refinement:
+    - LayoutParams = Java.use("android.widget.LinearLayout$LayoutParams")
+    - layoutParams = LayoutParams.$new(-1, -2)
+    - layoutParams.setMargins(16, 50, 16, 0) // left, top, right, bottom in pixels
+    - mainLayout.setLayoutParams(layoutParams)
+
+20. Title view creation:
+    - TextView = Java.use("android.widget.TextView")
+    - titleView = TextView.$new(activity)
     
-    Movement while spinning:
-    • CALC move_x = cos(127.6°) × 0.7 = -0.42
-    • CALC move_y = sin(127.6°) × 0.7 = 0.55
-    • WRITE move_stick_x = -0.42
-    • WRITE move_stick_y = 0.55
+    Title configuration:
+    • titleView.setText("BSRE Dev Version")
+    • titleView.setTextColor(0xFF00FF00) // green
+    • titleView.setTextSize(18.0) // 18 scaled pixels
+    • titleView.setGravity(Gravity.CENTER) (value: 0x11)
+    • titleView.setTypeface(Typeface.DEFAULT_BOLD)
+    • titleView.setPadding(0, 20, 0, 20) // top and bottom padding
+
+21. Title layout parameters:
+    - titleParams = LayoutParams.$new(-1, -2)
+    - titleParams.gravity = Gravity.CENTER_HORIZONTAL
+    - mainLayout.addView(titleView, titleParams)
 ```
 
-## Phase 3: Memory Manipulation (continuous)
-
-### Step 3.1: Game State Modification (every 100ms)
+### Step 2.4: Cheat Option Creation Loop (500-580ms)
 ```
-20. _0x5e59fd() - Stat manipulation:
-    • READ skill_cooldown = 1.2s → WRITE 0.0s (instant reset)
-    • READ ultimate_charge = 0.85 → WRITE 1.0 (fully charged)
-    • READ health = 4200 → VERIFY (no change needed)
-    • READ ammo_count = 3 → WRITE 3 (maintain, infinite set by patch)
+22. FOR EACH cheat_option IN ["enable dodge", "autoshoot", "xray", "aimbot", "spin modifier"]:
+    
+    a) Option container creation:
+       - optionLayout = LinearLayout.$new(activity)
+       - optionLayout.setOrientation(LinearLayout.HORIZONTAL)
+       - optionLayout.setBackgroundColor(0x40000000) // dark semi-transparent
+       - optionLayout.setPadding(32, 16, 32, 16) // 32dp left/right, 16dp top/bottom
+
+    b) Toggle switch creation:
+       - Switch = Java.use("android.widget.Switch")
+       - toggle = Switch.$new(activity)
+       - toggle.setChecked(false)
+       - toggle.setId(generateUniqueId()) // generates sequential IDs: 0x7F0A0001, 0x7F0A0002, etc.
+
+    c) Toggle layout parameters:
+       - toggleParams = LayoutParams.$new(-2, -2) // WRAP_CONTENT × WRAP_CONTENT
+       - toggleParams.gravity = Gravity.CENTER_VERTICAL
+       - toggleParams.setMargins(0, 0, 16, 0) // 16dp right margin
+
+    d) Label creation:
+       - label = TextView.$new(activity)
+       - label.setText(cheat_option)
+       - label.setTextColor(0xFFFFFFFF) // white
+       - label.setTextSize(16.0) // 16sp
+       - label.setTypeface(Typeface.DEFAULT)
+
+    e) Label layout parameters:
+       - labelParams = LayoutParams.$new(0, -2, 1.0f) // 0 width, weight=1.0
+       - labelParams.gravity = Gravity.CENTER_VERTICAL
+
+    f) Event listener attachment:
+       - OnCheckedChangeListener = Java.use("android.widget.CompoundButton$OnCheckedChangeListener")
+       - listener = OnCheckedChangeListener.$new()
+       - listener.onCheckedChanged.implementation = function(buttonView, isChecked) {
+           handleCheatToggle(cheat_option, isChecked);
+         }
+       - toggle.setOnCheckedChangeListener(listener)
+
+    g) View hierarchy assembly:
+       - optionLayout.addView(toggle, toggleParams)
+       - optionLayout.addView(label, labelParams)
+       - mainLayout.addView(optionLayout)
+
+23. Complete menu structure:
+    - Root: LinearLayout (vertical)
+      ├── TextView "BSRE Dev Version"
+      ├── LinearLayout (horizontal) "enable dodge"
+      │   ├── Switch (unchecked)
+      │   └── TextView "enable dodge"
+      ├── LinearLayout (horizontal) "autoshoot"
+      │   ├── Switch (unchecked)  
+      │   └── TextView "autoshoot"
+      ├── ... (3 more options)
 ```
 
-### Step 3.2: Anti-Detection (every 500ms)
+### Step 2.5: Final GUI Assembly (580-600ms)
 ```
-21. _0x105546() - Evasion techniques:
-    • Random delay: sleep(18ms) between operations
-    • Hook restoration: temporarily restore original function bytes
-    • Behavioral obfuscation: intentionally miss 1/15 shots
-    • Memory access pattern: shuffle read/write sequence
-```
+24. Scroll view wrapper:
+    - ScrollView = Java.use("android.widget.ScrollView")
+    - scrollView = ScrollView.$new(activity)
+    - scrollView.setLayoutParams(new ViewGroup.LayoutParams(-1, -2))
+    - scrollView.addView(mainLayout)
 
-## Phase 4: Command Processing (on-demand)
-
-### Step 4.1: Chat Command Handling (when message sent)
-```
-22. _0x561d0d() - Command interpreter:
-    MESSAGE RECEIVED: "/dodge on"
-
-    PROCESSING:
-    • Parse command: "dodge" with parameter "on"
-    • SET dodge_enabled = true
-    • SEND CHAT: "Dodge enabled"
-    • UPDATE GUI: toggle switch checked ✓
-
-    OTHER COMMANDS PROCESSED:
-    • "/aimbot" → toggle aimbot_enabled
-    • "/v2" → set dodge_algorithm_version = 2
-    • "/show" → display debug menu
-    • "/kill" → hide GUI
+25. Overlay finalization:
+    - wm.addView(scrollView, params)
+    - Sets initial visibility: scrollView.setVisibility(View.VISIBLE)
+    - Stores GUI references in global variables:
+        _0x39f4b2 = scrollView
+        _0x2e7801 = mainLayout  
+        _0x5d878e = activity
 ```
 
-## Phase 5: Error Handling & Recovery (as needed)
+## Phase 3: Memory Hooking Infrastructure (600-900ms)
 
-### Step 5.1: Exception Management
+### Step 3.1: Trampoline Memory Allocation (600-650ms)
 ```
-23. _0x468e6c() - Crash prevention:
-    • Memory read fails at 0x419D214C → fallback to 0x419D1E1C
-    • Function hook corrupted → reapply from backup
-    • GUI context lost → recreate overlay
-    • Game update detected → rescan function addresses
+26. _0x32b402() - Executable memory allocation:
+    - Allocates 4KB executable memory via mmap:
+        mmap(NULL, 4096, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
+    - Allocation address: 0x7FE00000
+    - Memory protection set to rwx
+
+27. Trampoline table initialization:
+    - Allocates trampoline table at 0x7FE01000 (256 entries)
+    - Each entry: {original_addr: 0x0, trampoline_addr: 0x0, original_bytes: byte[32]}
+    - Initializes all entries to zero
 ```
 
-This execution flow repeats continuously while the game is running, with each system operating at its designated frequency to maintain cheat functionality while minimizing detection risk.
+### Step 3.2: Function Hook Deployment (650-850ms)
+```
+28. HOOK 1: handleAutoShoot @ 0x4046CB38
+    a) Original function analysis:
+       - Reads 32 bytes from 0x4046CB38: 
+         "55 48 89 E5 41 57 41 56 49 89 D6 48 83 EC 20 4C"
+       - Function prologue confirmed
+       - Minimum patch size: 14 bytes (for relative jump)
+
+    b) Trampoline creation at 0x7FE00200:
+       - Copies original 14 bytes: "55 48 89 E5 41 57 41 56 49 89 D6 48 83 EC"
+       - Adds absolute jump back: "48 B8 38 CB 46 40 00 00 00 00 FF E0"
+         (MOV RAX, 0x4046CB44; JMP RAX) - jumps to instruction after hook
+
+    c) Hook assembly creation:
+       - Relative jump to handler: "E9 C3 55 02 00"
+         (JMP 0x40702100 - calculated as 0x40702100 - (0x4046CB38 + 5))
+       - NOP padding: "90 90 90 90 90 90 90 90 90"
+
+    d) Memory protection modification:
+       - mprotect(0x4046CB38, 14, PROT_READ|PROT_WRITE|PROT_EXEC)
+       - Writes hook bytes to 0x4046CB38
+       - mprotect(0x4046CB38, 14, PROT_READ|PROT_EXEC)
+
+    e) Trampoline table update:
+       - trampoline_table[0] = {
+           original_addr: 0x4046CB38,
+           trampoline_addr: 0x7FE00200, 
+           original_bytes: [0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41, 0x56, ...]
+         }
+
+29. HOOK 2: ShootStickSetState @ 0x4047770C
+    a) Original: "55 48 89 E5 41 57 41 56 41 55 41 54 53 48 83 EC 28"
+    b) Trampoline at 0x7FE00240
+    c) Hook: "E9 BD AA 02 00 90 90 90 90 90 90 90 90 90 90 90 90"
+    d) Protection modified and applied
+
+30. HOOK 3: movePlayerEncode @ 0x406C3DEC  
+    a) Original: "55 48 89 E5 41 57 41 56 41 55 41 54 53 48 81 EC 88 00 00 00"
+    b) Trampoline at 0x7FE00280
+    c) Hook: "E9 4A 49 03 00 90 90 90 90 90 90 90 90 90 90 90 90 90 90"
+    d) Protection modified and applied
+
+31. Total hooks deployed: 12
+    - Hook table stored at 0x7FE01000-0x7FE01400
+    - All trampolines verified for correctness
+```
+
+### Step 3.3: Memory Patch Application (850-900ms)
+```
+32. PATCH 1: Infinite Ammo @ CharacterHasAmmo function
+    - Locates function via pattern: "83 78 38 00 0F 94 C0 C3" (CMP [RAX+0x38],0; SETZ AL; RET)
+    - Function address: 0x4037C048
+    - Original bytes: "83 78 38 00" (CMP [RAX+0x38], 0x00)
+    - Patched bytes: "C6 40 38 01" (MOV BYTE [RAX+0x38], 0x01)
+    - Protection: mprotect(0x4037C048, 4, PROT_READ|PROT_WRITE|PROT_EXEC)
+    - Write patch, then restore protection
+
+33. PATCH 2: Team Check Bypass @ IsOwnedByOwnTeam
+    - Function address: 0x406752A8
+    - Original function: 28 bytes of team comparison logic
+    - Patch: "B8 01 00 00 00 C3" (MOV EAX, 0x1; RET)
+    - Applies 6-byte patch to replace entire function
+
+34. PATCH 3: Player Visibility @ HidesPlayer
+    - Function address: 0x404749C4  
+    - Original: complex visibility calculation
+    - Patch: "31 C0 C3" (XOR EAX, EAX; RET) - always return false
+    - Applies 3-byte patch
+
+35. Patch verification:
+    - Reads back all patched memory locations
+    - Confirms patches are active
+    - Stores patch information in patch_table at 0x7FE01400
+```
