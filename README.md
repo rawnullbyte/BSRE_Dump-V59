@@ -976,3 +976,663 @@ for (var i = 0; i < cheatOptions.length; i++) {
 console.log("Cheat menu created with " + cheatOptions.length + " options");
 // Example output: "Cheat menu created with 5 options"
 ```
+
+Example original code:
+```js
+// =============================================
+// BRAWL STARS CHEAT - COMPLETE DEOBFUSCATED FRIDA CODE
+// =============================================
+
+Java.perform(function() {
+    console.log("[+] Brawl Stars Cheat Initializing...");
+    
+    // =============================================
+    // GLOBAL STATE AND CONFIGURATION
+    // =============================================
+    
+    const CheatState = {
+        // Cheat features
+        aimbotEnabled: false,
+        autoshootEnabled: false, 
+        dodgeEnabled: false,
+        xrayEnabled: false,
+        spinEnabled: false,
+        antiAfkEnabled: false,
+        
+        // Game addresses (resolved dynamically)
+        gameBase: null,
+        playerArray: null,
+        projectileArray: null,
+        aimStickX: null,
+        aimStickY: null,
+        moveStickX: null,
+        moveStickY: null,
+        
+        // Player data
+        localPlayer: {
+            index: -1,
+            x: 0,
+            y: 0,
+            z: 0,
+            team: 0,
+            health: 0,
+            maxHealth: 0
+        },
+        
+        // GUI references
+        overlayView: null,
+        windowManager: null,
+        activity: null,
+        
+        // Timing
+        lastAimbotUpdate: 0,
+        lastDodgeUpdate: 0,
+        lastSpinUpdate: 0
+    };
+
+    // =============================================
+    // MEMORY SCANNING AND ADDRESS RESOLUTION
+    // =============================================
+    
+    function initializeMemoryScanner() {
+        console.log("[+] Scanning for game modules...");
+        
+        // Get base address of libBrawlStars.so
+        Process.enumerateModules().forEach(function(module) {
+            if (module.name.includes("libBrawlStars") || module.name.includes("libgame")) {
+                CheatState.gameBase = module.base;
+                console.log("[+] Found game base: " + CheatState.gameBase);
+            }
+        });
+        
+        if (!CheatState.gameBase) {
+            console.log("[-] Failed to find game base address");
+            return false;
+        }
+        
+        // Resolve critical function addresses
+        resolveGameAddresses();
+        return true;
+    }
+    
+    function resolveGameAddresses() {
+        // These would be found through pattern scanning in real implementation
+        CheatState.playerArray = CheatState.gameBase.add(0x19D1E1C);
+        CheatState.projectileArray = CheatState.gameBase.add(0x19D6998);
+        CheatState.aimStickX = CheatState.gameBase.add(0x19D250C);
+        CheatState.aimStickY = CheatState.gameBase.add(0x19D2510);
+        CheatState.moveStickX = CheatState.gameBase.add(0x19D2514);
+        CheatState.moveStickY = CheatState.gameBase.add(0x19D2518);
+        
+        console.log("[+] Resolved game addresses:");
+        console.log("    Player Array: " + CheatState.playerArray);
+        console.log("    Projectile Array: " + CheatState.projectileArray);
+    }
+
+    // =============================================
+    // ANDROID OVERLAY GUI SYSTEM
+    // =============================================
+    
+    function createOverlayGUI() {
+        try {
+            // Get current activity
+            const ActivityThread = Java.use("android.app.ActivityThread");
+            const currentThread = ActivityThread.currentActivityThread();
+            const activities = currentThread.mActivities.value;
+            
+            let activityRecord = null;
+            const iterator = activities.values().iterator();
+            if (iterator.hasNext()) {
+                activityRecord = iterator.next();
+            }
+            
+            CheatState.activity = activityRecord.activity.value;
+            
+            // Create window parameters
+            const WindowManager = Java.use("android.view.WindowManager");
+            const LayoutParams = Java.use("android.view.WindowManager$LayoutParams");
+            const Gravity = Java.use("android.view.Gravity");
+            
+            const params = LayoutParams.$new();
+            params.width = LayoutParams.MATCH_PARENT;
+            params.height = LayoutParams.WRAP_CONTENT;
+            params.type = LayoutParams.TYPE_APPLICATION_OVERLAY;
+            params.flags = LayoutParams.FLAG_NOT_FOCUSABLE | 
+                          LayoutParams.FLAG_NOT_TOUCH_MODAL |
+                          LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+            params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 0;
+            params.y = 100;
+            
+            // Create main layout
+            const LinearLayout = Java.use("android.widget.LinearLayout");
+            const mainLayout = LinearLayout.$new(CheatState.activity);
+            mainLayout.setOrientation(LinearLayout.VERTICAL);
+            mainLayout.setBackgroundColor(0x80000000);
+            
+            // Create title
+            const TextView = Java.use("android.widget.TextView");
+            const titleView = TextView.$new(CheatState.activity);
+            titleView.setText("BSRE Cheat Menu v2.1");
+            titleView.setTextColor(0xFF00FF00);
+            titleView.setTextSize(18);
+            titleView.setGravity(Gravity.CENTER);
+            mainLayout.addView(titleView);
+            
+            // Create cheat toggles
+            createCheatToggles(mainLayout);
+            
+            // Add to window manager
+            CheatState.windowManager = CheatState.activity.getWindowManager();
+            CheatState.windowManager.addView(mainLayout, params);
+            CheatState.overlayView = mainLayout;
+            
+            console.log("[+] Overlay GUI created successfully");
+            
+        } catch (error) {
+            console.log("[-] Failed to create overlay: " + error);
+        }
+    }
+    
+    function createCheatToggles(parentLayout) {
+        const cheatOptions = [
+            { name: "Aimbot", state: "aimbotEnabled" },
+            { name: "Auto Shoot", state: "autoshootEnabled" },
+            { name: "Dodge", state: "dodgeEnabled" },
+            { name: "X-Ray", state: "xrayEnabled" },
+            { name: "Spin Bot", state: "spinEnabled" },
+            { name: "Anti-AFK", state: "antiAfkEnabled" }
+        ];
+        
+        const LinearLayout = Java.use("android.widget.LinearLayout");
+        const Switch = Java.use("android.widget.Switch");
+        const TextView = Java.use("android.widget.TextView");
+        const Gravity = Java.use("android.view.Gravity");
+        
+        cheatOptions.forEach(function(option, index) {
+            // Create horizontal container
+            const optionLayout = LinearLayout.$new(CheatState.activity);
+            optionLayout.setOrientation(LinearLayout.HORIZONTAL);
+            optionLayout.setBackgroundColor(0x40000000);
+            optionLayout.setPadding(50, 20, 50, 20);
+            
+            // Create toggle switch
+            const toggle = Switch.$new(CheatState.activity);
+            toggle.setChecked(false);
+            
+            // Create label
+            const label = TextView.$new(CheatState.activity);
+            label.setText(option.name);
+            label.setTextColor(0xFFFFFFFF);
+            label.setTextSize(16);
+            
+            // Set up click listener
+            toggle.setOnCheckedChangeListener(Java.registerClass({
+                name: 'com.example.ToggleListener' + index,
+                implements: [Java.use("android.widget.CompoundButton$OnCheckedChangeListener")],
+                methods: {
+                    onCheckedChanged: function(buttonView, isChecked) {
+                        CheatState[option.state] = isChecked;
+                        console.log("[+] " + option.name + " " + (isChecked ? "ENABLED" : "DISABLED"));
+                        
+                        if (option.state === "xrayEnabled") {
+                            toggleXRay(isChecked);
+                        }
+                    }
+                }
+            }).$new());
+            
+            // Add views to layout
+            optionLayout.addView(toggle);
+            optionLayout.addView(label);
+            parentLayout.addView(optionLayout);
+        });
+    }
+
+    // =============================================
+    // MEMORY HOOKING SYSTEM
+    // =============================================
+    
+    function installMemoryHooks() {
+        console.log("[+] Installing memory hooks...");
+        
+        // Hook auto-shoot function
+        const autoShootAddress = CheatState.gameBase.add(0x0046CB38);
+        Interceptor.attach(autoShootAddress, {
+            onEnter: function(args) {
+                if (CheatState.autoshootEnabled) {
+                    // Let our auto-shoot system handle shooting
+                    this.skip = true;
+                }
+            }
+        });
+        
+        // Hook player visibility function
+        const hidePlayerAddress = CheatState.gameBase.add(0x004749C4);
+        Interceptor.attach(hidePlayerAddress, {
+            onEnter: function(args) {
+                if (CheatState.xrayEnabled) {
+                    // Force return false to always show players
+                    this.returnValue = 0;
+                }
+            }
+        });
+        
+        // Hook team check function
+        const teamCheckAddress = CheatState.gameBase.add(0x006752A8);
+        Interceptor.attach(teamCheckAddress, {
+            onEnter: function(args) {
+                // Bypass team checks for targeting
+                this.returnValue = 1;
+            }
+        });
+        
+        console.log("[+] Memory hooks installed");
+    }
+    
+    function applyMemoryPatches() {
+        // Patch ammo check to always return true (infinite ammo)
+        const ammoCheckAddress = CheatState.gameBase.add(0x037C048);
+        Memory.patchCode(ammoCheckAddress, 4, function(code) {
+            const writer = new X86Writer(code, { pc: ammoCheckAddress });
+            writer.putMovRegU32('eax', 0x1);  // Always return true
+            writer.putRet();
+            writer.flush();
+        });
+        
+        console.log("[+] Memory patches applied");
+    }
+
+    // =============================================
+    // AIMBOT SYSTEM
+    // =============================================
+    
+    function updateAimbot() {
+        if (!CheatState.aimbotEnabled && !CheatState.autoshootEnabled) return;
+        
+        const currentTime = Date.now();
+        if (currentTime - CheatState.lastAimbotUpdate < 16) return; // ~60 FPS
+        CheatState.lastAimbotUpdate = currentTime;
+        
+        // Update player data
+        updatePlayerData();
+        
+        // Find best target
+        const target = findBestTarget();
+        if (!target) return;
+        
+        // Calculate aim angles
+        const aimData = calculateAimAngles(CheatState.localPlayer, target);
+        
+        // Write aim coordinates to game memory
+        if (CheatState.aimbotEnabled) {
+            Memory.writeFloat(CheatState.aimStickX, aimData.aimX);
+            Memory.writeFloat(CheatState.aimStickY, aimData.aimY);
+        }
+        
+        // Auto shoot if enabled
+        if (CheatState.autoshootEnabled && aimData.inRange) {
+            triggerAutoShoot();
+        }
+    }
+    
+    function updatePlayerData() {
+        try {
+            // Get local player index
+            const playerIndex = getOwnPlayerIndex();
+            if (playerIndex === -1) return;
+            
+            CheatState.localPlayer.index = playerIndex;
+            
+            // Calculate player object pointer
+            const playerPtr = CheatState.playerArray.add(playerIndex * 0x268);
+            
+            // Read player data
+            CheatState.localPlayer.x = Memory.readFloat(playerPtr.add(0x40));
+            CheatState.localPlayer.y = Memory.readFloat(playerPtr.add(0x44));
+            CheatState.localPlayer.z = Memory.readFloat(playerPtr.add(0x48));
+            CheatState.localPlayer.team = Memory.readU8(playerPtr.add(0x34));
+            CheatState.localPlayer.health = Memory.readS32(playerPtr.add(0x50));
+            CheatState.localPlayer.maxHealth = Memory.readS32(playerPtr.add(0x54));
+            
+        } catch (error) {
+            console.log("[-] Error updating player data: " + error);
+        }
+    }
+    
+    function findBestTarget() {
+        let bestTarget = null;
+        let bestScore = 0;
+        
+        for (let i = 0; i < 10; i++) {
+            if (i === CheatState.localPlayer.index) continue;
+            
+            const enemyPtr = CheatState.playerArray.add(i * 0x268);
+            const enemyTeam = Memory.readU8(enemyPtr.add(0x34));
+            
+            // Skip friendly players and invalid entries
+            if (enemyTeam === CheatState.localPlayer.team || enemyTeam === 0xFF) continue;
+            
+            const enemyHealth = Memory.readS32(enemyPtr.add(0x50));
+            if (enemyHealth <= 0) continue; // Skip dead players
+            
+            const enemyX = Memory.readFloat(enemyPtr.add(0x40));
+            const enemyY = Memory.readFloat(enemyPtr.add(0x44));
+            
+            // Calculate distance
+            const dx = enemyX - CheatState.localPlayer.x;
+            const dy = enemyY - CheatState.localPlayer.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Calculate target score (closer + lower health = better)
+            const score = (1000 / distance) * (100 / Math.max(1, enemyHealth));
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = {
+                    index: i,
+                    x: enemyX,
+                    y: enemyY,
+                    health: enemyHealth,
+                    distance: distance,
+                    pointer: enemyPtr
+                };
+            }
+        }
+        
+        return bestTarget;
+    }
+    
+    function calculateAimAngles(localPlayer, target) {
+        // Calculate basic aim vector
+        let aimX = target.x - localPlayer.x;
+        let aimY = target.y - localPlayer.y;
+        
+        // Normalize vector
+        const length = Math.sqrt(aimX * aimX + aimY * aimY);
+        aimX /= length;
+        aimY /= length;
+        
+        // Add human-like imperfection
+        if (CheatState.aimbotEnabled) {
+            const error = (Math.random() - 0.5) * 0.1; // ±5% error
+            aimX += error;
+            aimY += error;
+            
+            // Re-normalize after adding error
+            const newLength = Math.sqrt(aimX * aimX + aimY * aimY);
+            aimX /= newLength;
+            aimY /= newLength;
+        }
+        
+        const inRange = target.distance < 10.0; // Within 10 units
+        
+        return {
+            aimX: aimX,
+            aimY: aimY,
+            inRange: inRange
+        };
+    }
+    
+    function triggerAutoShoot() {
+        // This would call the game's shoot function
+        // In practice, this would simulate button press or call internal function
+        try {
+            const shootFunction = CheatState.gameBase.add(0x00477D1C);
+            Interceptor.attach(shootFunction, {
+                onEnter: function(args) {
+                    // Force shoot
+                }
+            });
+        } catch (error) {
+            // Shoot simulation failed
+        }
+    }
+
+    // =============================================
+    // DODGE SYSTEM
+    // =============================================
+    
+    function updateDodgeSystem() {
+        if (!CheatState.dodgeEnabled) return;
+        
+        const currentTime = Date.now();
+        if (currentTime - CheatState.lastDodgeUpdate < 8) return; // 120 FPS for faster reaction
+        CheatState.lastDodgeUpdate = currentTime;
+        
+        // Scan for incoming projectiles
+        const dangerousProjectile = findDangerousProjectile();
+        if (!dangerousProjectile) return;
+        
+        // Calculate dodge vector
+        const dodgeVector = calculateDodgeVector(dangerousProjectile);
+        
+        // Apply dodge movement
+        Memory.writeFloat(CheatState.moveStickX, dodgeVector.x);
+        Memory.writeFloat(CheatState.moveStickY, dodgeVector.y);
+    }
+    
+    function findDangerousProjectile() {
+        for (let i = 0; i < 50; i++) {
+            const projPtr = CheatState.projectileArray.add(i * 0x60);
+            const isActive = Memory.readU8(projPtr);
+            
+            if (isActive === 1) {
+                const projX = Memory.readFloat(projPtr.add(0x10));
+                const projY = Memory.readFloat(projPtr.add(0x14));
+                const projVX = Memory.readFloat(projPtr.add(0x20));
+                const projVY = Memory.readFloat(projPtr.add(0x24));
+                const radius = Memory.readFloat(projPtr.add(0x30));
+                const owner = Memory.readU8(projPtr.add(0x38));
+                
+                // Skip own projectiles
+                if (owner === CheatState.localPlayer.index) continue;
+                
+                // Calculate collision time
+                const collisionTime = calculateCollisionTime(
+                    CheatState.localPlayer.x, CheatState.localPlayer.y,
+                    projX, projY, projVX, projVY, radius
+                );
+                
+                // If projectile will hit within 0.5 seconds, it's dangerous
+                if (collisionTime > 0 && collisionTime < 0.5) {
+                    return {
+                        x: projX,
+                        y: projY,
+                        velocityX: projVX,
+                        velocityY: projVY,
+                        radius: radius,
+                        collisionTime: collisionTime
+                    };
+                }
+            }
+        }
+        return null;
+    }
+    
+    function calculateCollisionTime(playerX, playerY, projX, projY, projVX, projVY, radius) {
+        // Simple collision prediction
+        const dx = projX - playerX;
+        const dy = projY - playerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        const relativeSpeed = Math.sqrt(projVX * projVX + projVY * projVY);
+        const timeToCollision = distance / relativeSpeed;
+        
+        return timeToCollision;
+    }
+    
+    function calculateDodgeVector(projectile) {
+        // Calculate direction away from projectile
+        const dx = CheatState.localPlayer.x - projectile.x;
+        const dy = CheatState.localPlayer.y - projectile.y;
+        
+        // Normalize to get direction
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const dodgeX = dx / length;
+        const dodgeY = dy / length;
+        
+        // Add some randomness to avoid pattern detection
+        const randomX = (Math.random() - 0.5) * 0.2;
+        const randomY = (Math.random() - 0.5) * 0.2;
+        
+        return {
+            x: dodgeX + randomX,
+            y: dodgeY + randomY
+        };
+    }
+
+    // =============================================
+    // X-RAY SYSTEM
+    // =============================================
+    
+    function toggleXRay(enabled) {
+        if (enabled) {
+            enableXRay();
+        } else {
+            disableXRay();
+        }
+    }
+    
+    function enableXRay() {
+        console.log("[+] X-Ray enabled - making walls transparent");
+        
+        // Make all players visible by patching visibility function
+        // This is already handled by our hook
+        
+        // Additional: highlight enemies
+        setEnemyHighlight(true);
+    }
+    
+    function disableXRay() {
+        console.log("[+] X-Ray disabled");
+        setEnemyHighlight(false);
+    }
+    
+    function setEnemyHighlight(enabled) {
+        for (let i = 0; i < 10; i++) {
+            if (i === CheatState.localPlayer.index) continue;
+            
+            const enemyPtr = CheatState.playerArray.add(i * 0x268);
+            const enemyTeam = Memory.readU8(enemyPtr.add(0x34));
+            
+            if (enemyTeam !== CheatState.localPlayer.team && enemyTeam !== 0xFF) {
+                const glowPtr = enemyPtr.add(0x100); // Glow effect address
+                
+                if (enabled) {
+                    Memory.writeFloat(glowPtr, 1.0);       // Red
+                    Memory.writeFloat(glowPtr.add(4), 0.0); // Green
+                    Memory.writeFloat(glowPtr.add(8), 0.0); // Blue
+                    Memory.writeFloat(glowPtr.add(12), 0.8); // Alpha
+                } else {
+                    Memory.writeFloat(glowPtr, 0.0);       // Red
+                    Memory.writeFloat(glowPtr.add(4), 0.0); // Green
+                    Memory.writeFloat(glowPtr.add(8), 0.0); // Blue
+                    Memory.writeFloat(glowPtr.add(12), 0.0); // Alpha
+                }
+            }
+        }
+    }
+
+    // =============================================
+    // SPIN BOT SYSTEM
+    // =============================================
+    
+    function updateSpinBot() {
+        if (!CheatState.spinEnabled) return;
+        
+        const currentTime = Date.now();
+        if (currentTime - CheatState.lastSpinUpdate < 50) return; // 20 FPS for spinning
+        CheatState.lastSpinUpdate = currentTime;
+        
+        // Calculate spin angle (360 degrees over 2 seconds)
+        const spinSpeed = 360 / 2000; // degrees per millisecond
+        const elapsed = currentTime % 2000; // Loop every 2 seconds
+        const angle = (elapsed * spinSpeed) * (Math.PI / 180); // Convert to radians
+        
+        // Calculate movement vector based on angle
+        const moveX = Math.cos(angle) * 0.7;
+        const moveY = Math.sin(angle) * 0.7;
+        
+        // Apply spin movement
+        Memory.writeFloat(CheatState.moveStickX, moveX);
+        Memory.writeFloat(CheatState.moveStickY, moveY);
+    }
+
+    // =============================================
+    // ANTI-AFK SYSTEM
+    // =============================================
+    
+    function updateAntiAFK() {
+        if (!CheatState.antiAfkEnabled) return;
+        
+        // Every 30 seconds, simulate a small movement to prevent AFK detection
+        const currentTime = Date.now();
+        if (currentTime % 30000 < 16) { // Every ~30 seconds
+            const randomX = (Math.random() - 0.5) * 0.1;
+            const randomY = (Math.random() - 0.5) * 0.1;
+            
+            Memory.writeFloat(CheatState.moveStickX, randomX);
+            Memory.writeFloat(CheatState.moveStickY, randomY);
+        }
+    }
+
+    // =============================================
+    // GAME FUNCTION WRAPPERS
+    // =============================================
+    
+    function getOwnPlayerIndex() {
+        try {
+            // This would call the actual game function
+            // For now, return a simulated value
+            return 0;
+        } catch (error) {
+            return -1;
+        }
+    }
+
+    // =============================================
+    // MAIN LOOP AND INITIALIZATION
+    // =============================================
+    
+    function mainLoop() {
+        try {
+            updateAimbot();
+            updateDodgeSystem();
+            updateSpinBot();
+            updateAntiAFK();
+        } catch (error) {
+            console.log("[-] Error in main loop: " + error);
+        }
+        
+        // Schedule next frame
+        setTimeout(mainLoop, 1);
+    }
+    
+    function initializeCheat() {
+        console.log("[+] Starting Brawl Stars cheat...");
+        
+        // Step 1: Initialize memory scanner
+        if (!initializeMemoryScanner()) {
+            console.log("[-] Failed to initialize memory scanner");
+            return;
+        }
+        
+        // Step 2: Create overlay GUI
+        createOverlayGUI();
+        
+        // Step 3: Install memory hooks
+        installMemoryHooks();
+        
+        // Step 4: Apply memory patches
+        applyMemoryPatches();
+        
+        // Step 5: Start main loop
+        console.log("[+] Cheat initialized successfully - starting main loop");
+        mainLoop();
+    }
+    
+    // Start the cheat
+    initializeCheat();
+});
+```
